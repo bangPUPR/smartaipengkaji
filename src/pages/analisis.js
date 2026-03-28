@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase.js';
 import { navigate } from '../lib/router.js';
 import { showSuccess, showError, showInfo } from '../components/toast.js';
 import { APP_CONFIG } from '../lib/config.js';
-import { runAspectAnalysis, runFinalConclusion } from '../lib/ai-router.js';
+import { runAspectAnalysis, runFinalConclusion, runSingleItemAnalysis } from '../lib/ai-router.js';
 import { marked } from 'marked';
 
 // ── Bobot Penilaian Per Aspek (%) ─────────────────────────────
@@ -125,7 +125,7 @@ function buildHtml(proyek, checklistData, result, hasChecklist) {
         </div>
       </div>
 
-      ${!hasChecklist ? renderNoDataPanel(proyek.id) : result ? renderResultPanel(result, proyek) : renderReadyPanel(proyek.id)}
+      ${!hasChecklist ? renderNoDataPanel(proyek.id) : result ? renderResultPanel(result, proyek, checklistData) : renderReadyPanel(proyek.id)}
 
       <!-- AI Progress Modal -->
       <div class="export-progress-overlay" id="ai-progress-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.3s ease;pointer-events:none;">
@@ -139,6 +139,28 @@ function buildHtml(proyek, checklistData, result, hasChecklist) {
             <div class="export-progress-fill" id="ai-progress-fill" style="height:100%;width:0%;background:var(--brand-500);transition:width 0.4s ease;border-radius:3px;"></div>
           </div>
           <div id="ai-progress-pct" style="font-size:0.75rem;color:var(--text-tertiary);font-variant-numeric:tabular-nums;">Menghubungkan ke API...</div>
+        </div>
+      </div>
+
+      <!-- Modular Detail Modal -->
+      <div id="modular-detail-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;backdrop-filter:blur(6px);align-items:center;justify-content:center;opacity:0;transition:opacity 0.3s ease;pointer-events:none;">
+        <div class="modular-detail-modal" style="background:var(--bg-card);width:90%;max-width:800px;max-height:85vh;border-radius:var(--radius-xl);box-shadow:var(--shadow-2xl);display:flex;flex-direction:column;overflow:hidden;transform:scale(0.95);transition:transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);">
+          <div class="flex-between" style="padding:var(--space-5) var(--space-6);background:var(--bg-input);border-bottom:1px solid var(--border-subtle)">
+            <div>
+              <div id="md-kode" style="font-family:monospace;font-weight:800;color:var(--brand-400);font-size:0.9rem">---</div>
+              <h3 id="md-nama" style="font-size:1.15rem;font-weight:700;color:var(--text-primary)">---</h3>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="window._closeModularDetail()" style="font-size:1.2rem;width:40px;height:40px;border-radius:50%">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div id="md-content" style="padding:var(--space-6);overflow-y:auto;flex:1;line-height:1.7;color:var(--text-secondary);font-size:0.95rem;">
+            <!-- AI Content Here -->
+          </div>
+          <div style="padding:var(--space-4) var(--space-6);background:var(--bg-input);border-top:1px solid var(--border-subtle);display:flex;justify-content:flex-end;gap:12px">
+             <button class="btn btn-secondary btn-sm" onclick="window._closeModularDetail()">Tutup</button>
+             <button id="md-btn-reanalyze" class="btn btn-primary btn-sm">Ulangi Analisis AI</button>
+          </div>
         </div>
       </div>
     </div>
@@ -194,7 +216,7 @@ function renderReadyPanel(proyekId) {
   `;
 }
 
-function renderResultPanel(result, proyek) {
+function renderResultPanel(result, proyek, checklistData) {
   const aspekDefs = [
     { key: 'skor_administrasi', label: 'Administrasi',   icon: 'fa-clipboard-list',    color: 'hsl(220,70%,55%)', kpiColor: 'kpi-blue'   },
     { key: 'skor_pemanfaatan',   label: 'Pemanfaatan',   icon: 'fa-map-location-dot', color: 'hsl(140,70%,50%)', kpiColor: 'kpi-green'  },
@@ -257,8 +279,27 @@ function renderResultPanel(result, proyek) {
       </div>
     </div>
 
-    <!-- Score Grid -->
-    <div class="aspek-score-grid">
+    <!-- Detailed Modular Audit (Utama) -->
+    <div id="modular-audit-section" style="margin-top:var(--space-6);margin-bottom:var(--space-8)">
+      <div class="flex-between" style="margin-bottom:var(--space-5);padding:var(--space-4);background:var(--bg-input);border-radius:var(--radius-lg);border-left:4px solid var(--brand-500)">
+        <div>
+          <h2 style="font-size:1.35rem;font-weight:800;color:var(--text-primary);letter-spacing:-0.02em">
+            <i class="fas fa-microchip" style="color:var(--brand-400);margin-right:8px"></i>Audit Modular Per Item (Total: ${checklistData.length} Item)
+          </h2>
+          <p style="font-size:0.85rem;color:var(--text-tertiary);margin-top:4px">Gunakan tombol AI pada masing-masing item untuk hasil audit yang sangat akurat.</p>
+        </div>
+        <div style="text-align:right">
+          <span class="badge badge-info" style="padding:6px 12px">DEEP REASONING ACTIVE</span>
+        </div>
+      </div>
+      <div style="max-height:800px;overflow-y:auto;padding-right:8px;margin-bottom:var(--space-6)">
+        ${renderDetailedModularAudit(checklistData)}
+      </div>
+    </div>
+
+    <!-- Score Grid (Summary) -->
+    <div style="margin-bottom:var(--space-4);font-weight:700;color:var(--text-tertiary);text-transform:uppercase;font-size:0.75rem;letter-spacing:0.1em">Ringkasan Skor Per Aspek</div>
+    <div class="aspek-score-grid" style="margin-bottom:var(--space-8)">
       ${aspekDefs.map(a => {
         const skor = result[a.key] || 0;
         const warna = skor >= 80 ? 'hsl(160,65%,46%)' : skor >= 60 ? 'hsl(40,80%,55%)' : 'hsl(0,74%,52%)';
@@ -283,7 +324,6 @@ function renderResultPanel(result, proyek) {
 
     <!-- Main Grid: Chart + Rekomendasi -->
     <div style="display:grid;grid-template-columns:360px 1fr;gap:var(--space-5)">
-
       <!-- Radar Chart -->
       <div class="card">
         <div class="card-title" style="margin-bottom:var(--space-4)">
@@ -291,18 +331,6 @@ function renderResultPanel(result, proyek) {
         </div>
         <div class="radar-wrap">
           <canvas id="radar-chart"></canvas>
-        </div>
-        <div style="margin-top:var(--space-4);padding-top:var(--space-4);border-top:1px solid var(--border-subtle)">
-          ${[
-            { label: '≥ 80', desc: 'Laik Fungsi', color: 'hsl(160,65%,46%)' },
-            { label: '60–79', desc: 'Laik Bersyarat', color: 'hsl(40,80%,55%)' },
-            { label: '< 60', desc: 'Tidak Laik / Kritis', color: 'hsl(0,74%,52%)' },
-          ].map(l => `
-            <div class="flex gap-3" style="align-items:center;margin-bottom:6px">
-              <div style="width:12px;height:12px;border-radius:3px;background:${l.color};flex-shrink:0"></div>
-              <span class="text-xs text-tertiary"><b>${l.label}</b> — ${l.desc}</span>
-            </div>
-          `).join('')}
         </div>
       </div>
 
@@ -316,21 +344,18 @@ function renderResultPanel(result, proyek) {
         </div>
         <div style="display:flex;flex-direction:column;gap:var(--space-3)">
           ${rekomendasi.length === 0 ? `
-            <div class="ai-finding success"><i class="fas fa-circle-check" style="margin-right:6px"></i>Tidak ada rekomendasi kritis. Bangunan dalam kondisi baik.</div>
+            <div class="ai-finding success"><i class="fas fa-circle-check" style="margin-right:6px"></i>Tidak ada rekomendasi kritis.</div>
           ` : rekomendasi.map((r, i) => {
-            const priorColors = { kritis: 'hsl(0,74%,52%)', tinggi: 'hsl(0,74%,52%)', sedang: 'hsl(40,80%,55%)', rendah: 'hsl(160,65%,46%)' };
-            const col = priorColors[r.prioritas?.toLowerCase()] || 'hsl(200,75%,52%)';
+            const col = { kritis: 'hsl(0,74%,52%)', tinggi: 'hsl(0,74%,52%)', sedang: 'hsl(40,80%,55%)' }[r.prioritas?.toLowerCase()] || 'hsl(200,75%,52%)';
             return `
               <div class="rekom-card">
                 <div class="rekom-priority" style="background:${col}"></div>
                 <div style="flex:1">
-                  <div class="flex gap-3" style="align-items:center;margin-bottom:4px;flex-wrap:wrap">
-                    <span class="text-sm font-semibold text-primary">${i+1}. ${escHtml(r.judul || '')}</span>
-                    <span class="badge" style="background:hsla(0,0%,50%,0.15);color:var(--text-tertiary);border:1px solid var(--border-subtle);font-size:0.68rem">${escHtml(r.aspek || '')}</span>
-                    <span class="badge" style="background:${col}22;color:${col};border:1px solid ${col}44;font-size:0.68rem">${escHtml(r.prioritas || '')}</span>
+                  <div class="flex gap-3" style="align-items:center;margin-bottom:4px">
+                    <span class="text-sm font-semibold">${i+1}. ${escHtml(r.judul || '')}</span>
+                    <span class="badge" style="font-size:0.6rem">${escHtml(r.prioritas || '')}</span>
                   </div>
-                  <p class="text-sm text-secondary">${escHtml(r.tindakan || '')}</p>
-                  ${r.standar ? `<div class="text-xs text-tertiary" style="margin-top:4px"><i class="fas fa-book" style="margin-right:4px"></i>Ref: ${escHtml(r.standar)}</div>` : ''}
+                  <p class="text-xs text-secondary">${escHtml(r.tindakan || '')}</p>
                 </div>
               </div>
             `;
@@ -524,6 +549,86 @@ window._runAspect = async (aspekTarget) => {
   } catch (error) {
     hideAIProgress();
     showError(`Gagal menganalisa Aspek ${aspekTarget}: ` + error.message);
+  }
+};
+
+window._runSingleItemAnalysis = async (itemId, aspek) => {
+  const btnWrap = document.getElementById(`btn-wrap-${itemId}`);
+  const originalBtn = btnWrap.innerHTML;
+  
+  try {
+    btnWrap.innerHTML = `<button class="btn btn-ghost btn-sm" disabled><i class="fas fa-spinner fa-spin"></i> AI Reasoning...</button>`;
+    
+    // 1. Ambil data item
+    const { data: item, error: fErr } = await supabase.from('checklist_items').select('*').eq('id', itemId).single();
+    if (fErr) throw fErr;
+
+    // 2. Jalankan AI via runSingleItemAnalysis
+    const result = await runSingleItemAnalysis(item, aspek);
+    
+    // 3. Update checklist_items
+    const { error: uErr } = await supabase
+      .from('checklist_items')
+      .update({
+         catatan: result.narasi_item_lengkap, // Simpan narasi AI ke catatan
+      })
+      .eq('id', itemId);
+    
+    if (uErr) throw uErr;
+
+    showSuccess(`Analisis Modular ${item.kode} selesai!`);
+    loadData(window._analisisProyekId); // Refresh UI untuk menampilkan status AI analyzed
+
+  } catch (error) {
+    showError(`Gagal Analisis Modular: ` + error.message);
+    btnWrap.innerHTML = originalBtn;
+  }
+};
+
+window._showModularDetail = async (itemId, aspek) => {
+  const overlay = document.getElementById('modular-detail-overlay');
+  const kodeEl = document.getElementById('md-kode');
+  const namaEl = document.getElementById('md-nama');
+  const contentEl = document.getElementById('md-content');
+  const reBtn = document.getElementById('md-btn-reanalyze');
+
+  try {
+    const { data: item, error } = await supabase.from('checklist_items').select('*').eq('id', itemId).single();
+    if (error) throw error;
+
+    kodeEl.innerText = item.kode;
+    namaEl.innerText = item.nama;
+    contentEl.innerHTML = item.catatan ? 
+      `<div class="markdown-content">${marked.parse(item.catatan)}</div>` : 
+      `<div style="text-align:center;padding:var(--space-10);color:var(--text-tertiary)">
+         <i class="fas fa-robot" style="font-size:3rem;margin-bottom:12px;opacity:0.3"></i>
+         <p>Belum ada hasil analisis AI untuk item ini.</p>
+       </div>`;
+
+    reBtn.onclick = () => {
+      window._closeModularDetail();
+      window._runSingleItemAnalysis(itemId, aspek);
+    };
+
+    overlay.style.display = 'flex';
+    setTimeout(() => {
+      overlay.style.opacity = '1';
+      overlay.style.pointerEvents = 'all';
+      overlay.querySelector('.modular-detail-modal').style.transform = 'scale(1)';
+    }, 10);
+
+  } catch (e) {
+    showError("Gagal memuat detail: " + e.message);
+  }
+};
+
+window._closeModularDetail = () => {
+  const overlay = document.getElementById('modular-detail-overlay');
+  if (overlay) {
+    overlay.style.opacity = '0';
+    overlay.style.pointerEvents = 'none';
+    overlay.querySelector('.modular-detail-modal').style.transform = 'scale(0.95)';
+    setTimeout(() => { overlay.style.display = 'none'; }, 300);
   }
 };
 
@@ -871,3 +976,110 @@ function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&
 function formatTanggal(s) { try { return new Date(s).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}); } catch { return s||''; } }
 function riskColor(r) { return { low:'hsl(160,65%,46%)', medium:'hsl(40,80%,55%)', high:'hsl(0,70%,58%)', critical:'hsl(330,70%,50%)' }[r]||'hsl(200,80%,58%)'; }
 function riskLabel(r) { return { low:'Rendah', medium:'Sedang', high:'Tinggi', critical:'Kritis' }[r]||r; }
+
+// ── Render Detailed Modular Audit (TABS UI) ──────────────────
+function renderDetailedModularAudit(checklistData) {
+  const grouped = {};
+  checklistData.forEach(item => {
+    const asp = item.kategori === 'administrasi' ? 'Administrasi' : (item.aspek || 'Lainnya');
+    if (!grouped[asp]) grouped[asp] = [];
+    grouped[asp].push(item);
+  });
+
+  // Urutan aspek dinamis + Prioritas standar
+  const allAspek = Object.keys(grouped).sort((a,b) => {
+     if (a === 'Administrasi') return -1;
+     if (b === 'Administrasi') return 1;
+     return a.localeCompare(b);
+  });
+
+  if (!window._activeModularTab || !allAspek.includes(window._activeModularTab)) {
+    window._activeModularTab = allAspek[0];
+  }
+
+  return `
+    <div class="modular-tabs-container" style="display:grid;grid-template-columns:260px 1fr;gap:var(--space-6);background:var(--bg-card);border-radius:var(--radius-xl);border:1px solid var(--border-subtle);overflow:hidden;min-height:600px">
+      
+      <!-- Sidebar Nav -->
+      <div class="modular-sidebar" style="background:var(--bg-input);border-right:1px solid var(--border-subtle);padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-2)">
+        <div style="font-size:0.7rem;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;margin-bottom:var(--space-2);padding:0 var(--space-2)">Kategori Poin Audit</div>
+        ${allAspek.map(asp => {
+          const items = grouped[asp];
+          const done = items.filter(it => !!it.catatan && it.catatan.length > 50).length;
+          const pct = Math.round((done / items.length) * 100);
+          const isActive = window._activeModularTab === asp;
+          
+          return `
+            <button class="modular-tab-btn ${isActive ? 'active' : ''}" 
+                    onclick="window._switchModularTab('${asp}')"
+                    id="tab-btn-${asp.replace(/\s+/g,'-')}"
+                    style="display:flex;flex-direction:column;align-items:flex-start;padding:var(--space-3) var(--space-4);border-radius:var(--radius-lg);border:none;background:${isActive ? 'var(--bg-card)' : 'transparent'};color:${isActive ? 'var(--brand-400)' : 'var(--text-secondary)'};cursor:pointer;transition:all 0.2s ease;text-align:left;box-shadow:${isActive ? 'var(--shadow-md)' : 'none'}">
+              <span style="font-size:0.9rem;font-weight:700">${asp}</span>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:4px;width:100%">
+                <div style="flex:1;height:4px;background:var(--border-subtle);border-radius:2px">
+                   <div style="width:${pct}%;height:100%;background:${pct === 100 ? 'var(--brand-500)' : 'var(--brand-400)'};border-radius:2px"></div>
+                </div>
+                <span style="font-size:0.65rem;font-weight:600;min-width:40px">${done}/${items.length} Item</span>
+              </div>
+            </button>
+          `;
+        }).join('')}
+      </div>
+
+      <!-- Content Area -->
+      <div class="modular-content-pane" style="padding:var(--space-6);max-height:800px;overflow-y:auto">
+        <div id="modular-items-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));gap:var(--space-4)">
+          ${(grouped[window._activeModularTab] || []).map(item => {
+            const hasAi = !!item.catatan && (item.catatan.includes('###') || item.catatan.length > 50);
+            return `
+              <div class="card item-card-modular" style="padding:var(--space-4);display:flex;flex-direction:column;justify-content:space-between;border-top:2px solid ${hasAi ? 'var(--brand-500)' : 'var(--border-subtle)'};transition:all 0.2s ease;cursor:pointer;background:var(--bg-card)" onclick="window._showModularDetail('${item.id}', '${window._activeModularTab}')">
+                <div>
+                  <div class="flex-between" style="margin-bottom:8px">
+                    <span style="font-family:monospace;font-weight:700;color:var(--brand-400);font-size:0.8rem">${item.kode}</span>
+                    <span class="badge" style="font-size:0.6rem;background:var(--bg-input)">${escHtml(item.status || 'Belum')}</span>
+                  </div>
+                  <h4 style="font-size:0.85rem;font-weight:600;margin-bottom:12px;line-height:1.4;color:var(--text-primary);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;height:2.8rem">
+                    ${escHtml(item.nama)}
+                  </h4>
+                  ${hasAi ? `
+                    <div style="font-size:0.7rem;color:var(--text-secondary);background:hsla(220,70%,50%,0.05);padding:10px;border-radius:8px;margin-bottom:12px;border:1px solid var(--brand-200);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;position:relative">
+                      <i class="fas fa-quote-left" style="color:var(--brand-300);position:absolute;top:4px;left:4px;font-size:0.5rem;opacity:0.5"></i>
+                      ${item.catatan.replace(/#[# ]+/g, '').substring(0, 120)}...
+                    </div>
+                  ` : `
+                    <div style="height:3rem;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:0.7rem;font-style:italic;margin-bottom:12px;border:1px dashed var(--border-subtle);border-radius:8px">
+                      Klik untuk analisis modular
+                    </div>
+                  `}
+                </div>
+                
+                <div id="btn-wrap-${item.id}" onclick="event.stopPropagation()">
+                  <button class="btn ${hasAi ? 'btn-secondary' : 'btn-outline'} btn-sm" onclick="window._runSingleItemAnalysis('${item.id}', '${window._activeModularTab}')" style="width:100%;font-size:0.75rem;padding:var(--space-2)">
+                    <i class="fas ${hasAi ? 'fa-rotate-right' : 'fa-brain'}"></i> ${hasAi ? 'Ulangi Analisis' : 'Analisis AI'}
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+
+    <style>
+      .modular-tab-btn:hover { background: hsla(220,70%,50%,0.05) !important; color: var(--brand-400) !important; }
+      .modular-tab-btn.active { background: var(--bg-card) !important; border-left: 3px solid var(--brand-500) !important; border-radius: 0 8px 8px 0 !important; }
+      .item-card-modular:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); border-top-color: var(--brand-400) !important; }
+    </style>
+  `;
+}
+
+window._switchModularTab = (aspek) => {
+  window._activeModularTab = aspek;
+  // Karena loadData akan me-render ulang seluruh halaman, kita panggil loadData kembali
+  // dengan id proyek yang sama
+  if (window._analisisProyekId) {
+    // Optimasi: Jika ingin instan tanpa fetch ulang, bisa dimanipulasi DOM saja
+    // Tapi loadData menjamin integritas state.
+    loadData(window._analisisProyekId);
+  }
+};

@@ -95,49 +95,52 @@ function extractJSON(text) {
  */
 function getPromptForItem(item, aspek, roleTitle, standard) {
   const statusLabel = {
-    'ada_sesuai': 'Ada & Sesuai',
-    'ada_tidak_sesuai': 'Ada Tapi Tidak Sesuai',
-    'tidak_ada': 'Tidak Ada / Kosong',
-    'buruk': 'Kondisi Buruk',
-    'kritis': 'Kondisi Kritis',
-    'tidak_wajib': 'Tidak Wajib'
+    'ada_sesuai': 'Ada & Sesuai Standar',
+    'ada_tidak_sesuai': 'Penyimpangan Dokumen/Kondisi',
+    'tidak_ada': 'Ketidakadaan (Missing Data/Component)',
+    'buruk': 'Degradasi Berat',
+    'kritis': 'Kegagalan Teknis Kritis',
+    'tidak_wajib': 'Pengecualian (N/A)'
   }[item.status] || item.status;
 
-  const standardRef = aspek.toLowerCase().includes('struktur') ? 'SNI 9273:2025 & PP No. 16 Tahun 2021' : standard;
+  const standardRef = aspek.toLowerCase().includes('struktur') ? 'SNI 1726, SNI 2847, dan SNI 9273:2025' : standard;
 
-  return `Anda adalah ${roleTitle} (Senior Technical Auditor).
-Tugas: Menyusun ANALISIS TEKNIS FORENSIK MENDALAM untuk satu sub-item pemeriksaan SLF.
-Item ini adalah bagian dari kepatuhan terhadap Pasal 216-228 PP No. 16 Tahun 2021.
+  return `Anda adalah ${roleTitle} - Pakar Audit Forensik Bangunan Gedung.
+Tugas: Menyusun LAPORAN KAJIAN TEKNIS FORENSIK (MENDALAM) khusus untuk item berikut:
 
-DETAIL PEMERIKSAAN:
-ASPEK: ${aspek.toUpperCase()}
-KODE: ${item.kode}
-SUB-ITEM: ${item.nama}
-STATUS: ${statusLabel}
-CATATAN LAPANGAN: ${item.catatan || 'Kondisi lapangan sesuai standar operasional.'}
-STANDAR ACUAN: ${standardRef}
+# INFORMASI ITEM
+- ASPEK: ${aspek.toUpperCase()}
+- KODE: ${item.kode}
+- NAMA PARAMETER: ${item.nama}
+- STATUS EKSISTING: ${statusLabel}
+- CATATAN LAPANGAN: ${item.catatan || 'Kondisi lapangan memerlukan pengecekan mendalam sesuai SOP.'}
+- STANDAR ACUAN UTAMA: ${standardRef}
 
-INSTRUKSI ANALISIS (DEEP REASONING ENGINEERING):
-1. [TEMUAN]: Jabarkan kondisi fisik/dokumen secara spesifik. Jika statusnya tidak sesuai, jelaskan secara patologis (misal: jika struktur, sebutkan retakan/deformasi; jika arsitektur, sebutkan penyimpangan dimensi).
-2. [METODOLOGI]: Jelaskan langkah audit teknis yang dilakukan (Misal: Pengukuran laser, pengujian tekan, audit silang gambar As-built).
-3. [EVALUASI]: Analisis dampak penyimpangan terhadap ambang batas keselamatan (Life Safety) atau kenyamanan pengguna sesuai standar teknis PUPR.
-4. [JUSTIFIKASI]: Wajib sebutkan hubungan sub-item ini dengan kelaikan fungsi bangunan berdasarkan ayat spesifik di pasal terkait PP 16/2021.
-5. [REKOMENDASI]: Berikan solusi perbaikan yang "Implementable" (dapat dikerjakan) dan sebutkan prioritas tindakannya.
+# INSTRUKSI ANALISIS (ENGINEERING DEEP REASONING):
+Jalankan simulasi penalaran teknis dengan struktur bab berikut:
+
+1. [ANALISIS PATOLOGI]: Identifikasi akar masalah (root cause) dari penyimpangan yang ada (fisik maupun administratif). Jelaskan mekanismenya secara teknis.
+2. [EVALUASI KINERJA]: Bandingkan kondisi eksisting dengan persyaratan minimum pada ${standardRef}. Berikan persentase deviasi jika memungkinkan.
+3. [JUSTIFIKASI REGULASI]: Hubungkan temuan ini dengan pasal-pasal spesifik dalam PP No. 16 Tahun 2021 (Pasal ${aspek.toLowerCase().includes('teknis') ? '211-228' : '24-27'}) dan dampak hukumnya terhadap SLF.
+4. [SIMULASI RISIKO & IMPACT]: Apa yang terjadi jika item ini tidak diperbaiki? Skenario kegagalan (Life Safety, Kesehatan, atau Kegagalan Struktur).
+5. [MITIGASI & RETROFIT]: Berikan langkah perbaikan (remedial work) atau strategi mitigasi jangka pendek dan panjang.
 
 Output WAJIB format JSON MURNI:
 {
   "item_kode": "${item.kode}",
-  "risk_score": (1-10),
-  "status_evaluasi": "Sesuai/Tidak Sesuai/Kritikal",
+  "risk_score": (Integer 1-100),
+  "status_evaluasi": "NORMAL/MINOR_DEVIATION/CRITICAL_FAILURE",
   "technical_sheet": {
-    "temuan": "...",
-    "metodologi": "...",
-    "analisis": "...",
+    "patologi": "...",
+    "evaluasi_kinerja": "...",
     "justifikasi": "...",
+    "risiko": "...",
     "rekomendasi": "..."
   },
-  "narasi_item_lengkap": "(Gabungkan poin 1-5 menjadi satu narasi profesional ±250 kata)"
-}`;
+  "narasi_item_lengkap": "### LAPORAN KAJIAN TEKNIS: ${item.kode}\\n\\n#### A. ANALISIS PATOLOGI & TEMUAN\\n(Minimal 2 paragraf teknis)\\n\\n#### B. EVALUASI KEPATUHAN STANDAR\\n(Sebutkan SNI/Permen terkait secara detail)\\n\\n#### C. ANALISIS RISIKO & KESELAMATAN (LIFE SAFETY)\\n(Simulasikan dampak kegagalan)\\n\\n#### D. JUSTIFIKASI REGULASI PP 16/2021\\n(Sebutkan Pasal dan Ayat terkait)\\n\\n#### E. REKOMENDASI PERBAIKAN & MITIGASI\\n(Gunakan poin-poin teknis)"
+}
+
+PENTING: Gunakan terminologi teknik sipil/arsitektur yang presisi. Narasi minimal 300 kata.`;
 }
 
 /**
@@ -216,40 +219,9 @@ export async function runAspectAnalysis(aspek, items, onProgress) {
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     if (onProgress) onProgress(i + 1, items.length, `Sedang Menganalisis: ${item.nama}`);
-
-    const itemPrompt = getPromptForItem(item, aspek, roleTitle, standard);
     
-    try {
-      const respText = await safeCall(async () => {
-        const failoverChain = [];
-        if (!blacklistedModels.has(targetModel.name)) failoverChain.push(targetModel);
-        if (env.VITE_GROQ_API_KEY && !blacklistedModels.has(MODELS.GROQ.name)) failoverChain.push(MODELS.GROQ);
-        if (env.VITE_OPENROUTER_API_KEY && !blacklistedModels.has(MODELS.OPENROUTER.name)) failoverChain.push(MODELS.OPENROUTER);
-        if (!blacklistedModels.has(MODELS.GEMINI.name)) failoverChain.push(MODELS.GEMINI);
-
-        let lastError = null;
-        for (const model of failoverChain) {
-          try {
-            if (model.vendor === 'google') return await fetchGemini(model, itemPrompt);
-            if (model.vendor === 'openai') {
-               if (model.key || model.id.includes('llama')) return await fetchOpenAI(model, itemPrompt);
-            }
-            if (model.vendor === 'anthropic') return await fetchClaude(model, itemPrompt);
-            if (model.vendor === 'openrouter') return await fetchOpenRouter(model, itemPrompt);
-          } catch (err) {
-            lastError = err;
-            if (err.message.includes('429') || err.message.includes('quota')) blacklistedModels.add(model.name);
-          }
-        }
-        throw lastError || new Error("Failover Exhausted.");
-      });
-
-      const parsed = parseAIJson(respText);
-      results.push(parsed);
-    } catch (err) {
-      console.error(`Gagal:`, err);
-      results.push({ item_kode: item.kode, status_evaluasi: "Error", analisis_mendalam: `Terjadi kendala teknis AI: ${err.message}` });
-    }
+    const analyzed = await runSingleItemAnalysis(item, aspek, { roleTitle, standard, targetModel, blacklistedModels });
+    results.push(analyzed);
     
     await new Promise(r => setTimeout(r, 400));
   }
@@ -284,6 +256,59 @@ export async function runAspectAnalysis(aspek, items, onProgress) {
     })),
     meta: { provider: `Deep Research Engine`, risk_highlights: finalJson.insight_kritis || [] }
   };
+}
+
+/**
+ * Menjalankan Analisis AI Modular untuk SATU ITEM tunggal
+ */
+export async function runSingleItemAnalysis(item, aspek, options = {}) {
+  const { 
+    roleTitle = 'Digital Technical Consultant SLF', 
+    standard = 'NSPK & PP No. 16 Tahun 2021', 
+    targetModel = MODELS.GEMINI, 
+    blacklistedModels = new Set() 
+  } = options;
+
+  console.log(`[AI Router] Modular Analysis for: ${item.kode} - ${item.nama}`);
+
+  const itemPrompt = getPromptForItem(item, aspek, roleTitle, standard);
+  
+  try {
+    const respText = await safeCall(async () => {
+      const failoverChain = [];
+      if (!blacklistedModels.has(targetModel.name)) failoverChain.push(targetModel);
+      if (env.VITE_GROQ_API_KEY && !blacklistedModels.has(MODELS.GROQ.name)) failoverChain.push(MODELS.GROQ);
+      if (env.VITE_OPENROUTER_API_KEY && !blacklistedModels.has(MODELS.OPENROUTER.name)) failoverChain.push(MODELS.OPENROUTER);
+      if (!blacklistedModels.has(MODELS.GEMINI.name)) failoverChain.push(MODELS.GEMINI);
+
+      let lastError = null;
+      for (const model of failoverChain) {
+        try {
+          if (model.vendor === 'google') return await fetchGemini(model, itemPrompt);
+          if (model.vendor === 'openai') {
+             if (model.key || model.id.includes('llama')) return await fetchOpenAI(model, itemPrompt);
+          }
+          if (model.vendor === 'anthropic') return await fetchClaude(model, itemPrompt);
+          if (model.vendor === 'openrouter') return await fetchOpenRouter(model, itemPrompt);
+        } catch (err) {
+          lastError = err;
+          if (err.message.includes('429') || err.message.includes('quota')) blacklistedModels.add(model.name);
+        }
+      }
+      throw lastError || new Error("Failover Exhausted.");
+    });
+
+    const parsed = parseAIJson(respText);
+    return parsed;
+  } catch (err) {
+    console.error(`Gagal Single Item:`, err);
+    return { 
+      item_kode: item.kode, 
+      status_evaluasi: "Error", 
+      technical_sheet: { patologi: `Gagal: ${err.message}` },
+      narasi_item_lengkap: `Terjadi kendala teknis AI saat menganalisis item ini: ${err.message}` 
+    };
+  }
 }
 
 function parseAIJson(text) {
