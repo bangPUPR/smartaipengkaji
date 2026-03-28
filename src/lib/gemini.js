@@ -12,12 +12,12 @@ const MODELS = {
   },
   OPENAI: {
     id: 'gpt-4o',
-    url: '/api/openai/v1/chat/completions',
+    url: env.PROD ? 'https://api.openai.com/v1/chat/completions' : '/api/openai/v1/chat/completions',
     key: env.VITE_OPENAI_API_KEY
   },
   CLAUDE: {
     id: 'claude-3-5-sonnet-20241022',
-    url: '/api/claude/v1/messages',
+    url: env.PROD ? 'https://api.anthropic.com/v1/messages' : '/api/claude/v1/messages',
     key: env.VITE_CLAUDE_API_KEY
   }
 };

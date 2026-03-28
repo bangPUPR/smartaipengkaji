@@ -10,34 +10,34 @@ const MODELS = {
   GEMINI: {
     id: 'gemini-1.5-flash', 
     name: 'Gemini 1.5 Flash',
-    url: `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${env.VITE_GEMINI_API_KEY}`,
+    url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.VITE_GEMINI_API_KEY}`,
     vendor: 'google'
   },
   GROQ: {
     id: 'llama-3.3-70b-versatile',
     name: 'Groq Llama 3.3',
-    url: '/api/groq/v1/chat/completions', 
+    url: env.PROD ? 'https://api.groq.com/openai/v1/chat/completions' : '/api/groq/v1/chat/completions', 
     key: env.VITE_GROQ_API_KEY,
     vendor: 'openai'
   },
   OPENROUTER: {
     id: 'google/gemini-2.0-flash-lite:free',
     name: 'OpenRouter Free',
-    url: '/api/openrouter/v1/chat/completions', 
+    url: env.PROD ? 'https://openrouter.ai/api/v1/chat/completions' : '/api/openrouter/v1/chat/completions', 
     key: env.VITE_OPENROUTER_API_KEY,
     vendor: 'openrouter'
   },
   OPENAI: {
     id: 'gpt-4o',
     name: 'OpenAI GPT-4o',
-    url: '/api/openai/v1/chat/completions', 
+    url: env.PROD ? 'https://api.openai.com/v1/chat/completions' : '/api/openai/v1/chat/completions', 
     key: env.VITE_OPENAI_API_KEY,
     vendor: 'openai'
   },
   CLAUDE: {
     id: 'claude-3-5-sonnet-20241022',
     name: 'Claude 3.5 Sonnet',
-    url: '/api/claude/v1/messages', 
+    url: env.PROD ? 'https://api.anthropic.com/v1/messages' : '/api/claude/v1/messages', 
     key: env.VITE_CLAUDE_API_KEY,
     vendor: 'anthropic'
   }
