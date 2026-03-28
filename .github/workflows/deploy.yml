@@ -38,8 +38,34 @@ jobs:
           cache: 'npm'
       - name: Install dependencies
         run: npm install
+      - name: Diagnostic Env Check
+        run: |
+          echo "==== Verifikasi Variabel Lingkungan ===="
+          echo "VITE_SUPABASE_URL Length: ${#VITE_SUPABASE_URL}"
+          echo "VITE_SUPABASE_ANON_KEY Length: ${#VITE_SUPABASE_ANON_KEY}"
+          echo "VITE_GEMINI_API_KEY Length: ${#VITE_GEMINI_API_KEY}"
+          echo "========================================"
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+
       - name: Build
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          VITE_OPENAI_API_KEY: ${{ secrets.VITE_OPENAI_API_KEY }}
+          VITE_CLAUDE_API_KEY: ${{ secrets.VITE_CLAUDE_API_KEY }}
+          VITE_GROQ_API_KEY: ${{ secrets.VITE_GROQ_API_KEY }}
+          VITE_OPENROUTER_API_KEY: ${{ secrets.VITE_OPENROUTER_API_KEY }}
+          VITE_GOOGLE_APPS_SCRIPT_URL: ${{ secrets.VITE_GOOGLE_APPS_SCRIPT_URL }}
+          VITE_GCP_API_KEY: ${{ secrets.VITE_GCP_API_KEY }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_APP_NAME: 'SKPSLF'
+          VITE_APP_VERSION: '1.0.0'
+          VITE_BASE_URL: '/smartaipengkaji'
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Upload artifact
